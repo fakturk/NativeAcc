@@ -13,6 +13,13 @@
 #define LOOPER_ID 1
 #define SAMP_PER_SEC 100
 
+ jobject g_object;
+ jmethodID g_method;
+ JNIEnv *g_env;
+
+ JavaVM *jvm;
+
+
 
 
 
@@ -105,6 +112,9 @@ void Java_netlab_fakturk_nativeacc_MainActivity_sensorValue(JNIEnv* env, jobject
 
     LOGI("sensorValue() - ALooper_forThread()");
 
+// Identify the looper associated with the calling thread, or create one if it does not exist.
+// A looper is a message loop for a thread and will handle the sensor event callbacks.
+
     ALooper* looper = ALooper_forThread();
 
     if(looper == NULL)
@@ -118,9 +128,26 @@ void Java_netlab_fakturk_nativeacc_MainActivity_sensorValue(JNIEnv* env, jobject
 //    gyroSensor = ASensorManager_getDefaultSensor(sensorManager, ASENSOR_TYPE_GYROSCOPE);
 //    magSensor = ASensorManager_getDefaultSensor(sensorManager, ASENSOR_TYPE_MAGNETIC_FIELD);
 
+        jclass clazz = (*env).GetObjectClass(thiz);
+    if (clazz == NULL) {
+        std::cout << "Failed to find class" << std::endl;
+    }
 
+    jmethodID setAccX = env->GetMethodID(clazz, "setAccX", "(F)V");
+    g_method = setAccX;
+    if (g_method == NULL) {
+        std::cout << "Unable to get method ref" << std::endl;
+    }
+    g_object = env->NewGlobalRef(thiz);
+    g_env = env;
+
+    (*env).GetJavaVM(&jvm);
+
+
+    g_env->CallVoidMethod(g_object,g_method,4.0);
 
     sensorEventQueue = ASensorManager_createEventQueue(sensorManager, looper, 3, get_sensor_events, sensor_data);
+    g_env->CallVoidMethod(g_object,g_method,5.0);
 
     ASensorEventQueue_enableSensor(sensorEventQueue, accSensor);
 //    ASensorEventQueue_enableSensor(sensorEventQueue, gyroSensor);
@@ -132,6 +159,8 @@ void Java_netlab_fakturk_nativeacc_MainActivity_sensorValue(JNIEnv* env, jobject
 //    int c = ASensor_getMinDelay(magSensor);
 //    LOGI("min-delay: %d, %d, %d",a,b,c);
 
+//    typedef int (*ALooper_callbackFunc)(int fd, int events, void* data);
+
     LOGI("min-delay: %d",a);
     ASensorEventQueue_setEventRate(sensorEventQueue, accSensor, 100000);
 
@@ -142,10 +171,7 @@ void Java_netlab_fakturk_nativeacc_MainActivity_sensorValue(JNIEnv* env, jobject
 
     LOGI("sensorValue() - START");
 
-        jclass clazz = (*env).GetObjectClass(thiz);
-    jmethodID setAccX = env->GetMethodID(clazz, "setAccX", "(F)V");
 
-    env->CallVoidMethod(thiz,setAccX,cAcc[0]);
 
 }
 
@@ -153,13 +179,59 @@ void Java_netlab_fakturk_nativeacc_MainActivity_sensorValue(JNIEnv* env, jobject
 
 
 static int get_sensor_events(int fd, int events, void* data) {
+//    LOGI("Beginning of get sensors events");
     ASensorEvent event;
     //ASensorEventQueue* sensorEventQueue;
+    JNIEnv *env ;
+    int getEnvStat = jvm->GetEnv((void **)&env, JNI_VERSION_1_6);
+    if (getEnvStat == JNI_EDETACHED) {
+        std::cout << "GetEnv: not attached" << std::endl;
+        if (jvm->AttachCurrentThread((JNIEnv **) (void **) &env, NULL) != 0) {
+            std::cout << "Failed to attach" << std::endl;
+        }
+    } else if (getEnvStat == JNI_OK) {
+        //
+    } else if (getEnvStat == JNI_EVERSION) {
+        std::cout << "GetEnv: version not supported" << std::endl;
+    }
+
+    env->CallVoidMethod(g_object, g_method, 7.0);
+
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+    }
+
+//    jvm->DetachCurrentThread();
+
+
+
+//    (*jvm).AttachCurrentThread(&env, NULL);
+    jfloat jfloat1 = 6.0;
+
+//    LOGI("before clazz");
+//    jclass clazz = (*env).GetObjectClass(g_object);
+//    LOGI("before setAccX");
+//
+//    jmethodID setAccX = env->GetMethodID(c, "setAccX", "(F)V");
+//    env->ExceptionClear();
+//    env->CallVoidMethod(g_object,g_method,jfloat1);
+
     while (ASensorEventQueue_getEvents(sensorEventQueue, &event, 1) > 0) {
         if(event.type == ASENSOR_TYPE_ACCELEROMETER) {
+//            LOGI("inside if for acc");
             cAcc[0] = event.acceleration.x;
             cAcc[1] = event.acceleration.y;
             cAcc[2] = event.acceleration.z;
+
+
+//            g_env.CallVoidMethod(g_object,g_method,5.0);
+
+//            LOGI("after ");
+//            if(g_env->ExceptionOccurred()){
+//                //panic! Light fires! The British are coming!!!
+//                LOGI("OMG");
+//                g_env->ExceptionClear();
+//            }
 
 
 //            LOGI("accl(x,y,z,t): %f %f %f %lld", event.acceleration.x, event.acceleration.y, event.acceleration.z, event.timestamp);
